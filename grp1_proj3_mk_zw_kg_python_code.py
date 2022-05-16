@@ -1,0 +1,54 @@
+import cv2
+from cv2 import aruco
+import RPi.GPIO as gpio
+from time import sleep
+
+# --------------------------------------Define I/O Pins-------------------------
+triggerPin = 13
+friendlyPin = 5
+enemyPin = 6
+
+# --------------------------------------Setup I/O Pins--------------------------
+gpio.setmode(gpio.BCM)
+gpio.setwarnings(False)
+gpio.setup(triggerPin,gpio.IN)
+gpio.setup(friendlyPin, gpio.OUT)
+gpio.setup(enemyPin, gpio.OUT)
+
+# --------------------------------------Setup Camera and Aruco Tags Dict--------
+camPort = 0
+
+markerSize = 6  # number of boxes in rows and cols of the tag
+totalMarkers = 250  # used for defining the dictionary
+keyinp = 1
+key = getattr(aruco, f'DICT_{markerSize}X{markerSize}_{totalMarkers}')
+arucoDict = aruco.Dictionary_get(key)   # defining the aruco dictionary
+
+# -------------------------------------Main Program-----------------------------
+while(True):
+    gpio.output(friendlyPin, gpio.LOW)
+    gpio.output(enemyPin, gpio.LOW)
+    if(gpio.input(triggerPin)==False):
+        print("waiting for signal")
+        sleep(.1)
+    elif(gpio.input(triggerPin)):
+        camHandle = cv2.VideoCapture(camPort)
+        ret, img = camHandle.read()     # reading frames from video feed
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)    # converting to grayscale
+        ids = [];
+        bboxs, ids, rejected = aruco.detectMarkers(gray, arucoDict)     # finding tags in image
+        aruco.drawDetectedMarkers(img, bboxs)
+        if(ids==None):
+            print("Nothing Detected")
+        elif(ids<=9):
+            print("friendly")
+            gpio.output(friendlyPin,gpio.HIGH)
+            sleep(.75)
+            gpio.output(friendlyPin,gpio.LOW)
+        elif(ids>=10 and ids<=19): #Enemy Tags 10-19
+            print("ENEMY")
+            gpio.output(enemyPin,gpio.HIGH)
+            sleep(.75)
+            gpio.output(friendlyPin,gpio.LOW)
+        camHandle.release()
+
